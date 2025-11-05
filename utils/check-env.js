@@ -22,6 +22,18 @@ requiredVars.forEach(({ name, description }) => {
       ? `${value.substring(0, 4)}...${value.substring(value.length - 4)}`
       : '***';
     console.log(`✅ ${name}: ${masked}`);
+    
+    // Additional validation for Application ID
+    if (name === 'DISCORD_APPLICATION_ID') {
+      // Application ID should be a numeric string (Discord uses Snowflake IDs)
+      if (!/^\d+$/.test(value)) {
+        console.log(`   ⚠️  WARNING: Application ID should be numeric, got: ${value}`);
+        console.log(`   Make sure you're using the Application ID, not the Public Key!`);
+      } else if (value.length < 17 || value.length > 19) {
+        console.log(`   ⚠️  WARNING: Application ID length seems unusual (${value.length} digits)`);
+        console.log(`   Typical Discord Application IDs are 17-19 digits long`);
+      }
+    }
   }
 });
 

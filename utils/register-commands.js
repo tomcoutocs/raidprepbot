@@ -26,6 +26,24 @@ const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_BOT_TOKEN)
     const applicationId = process.env.DISCORD_APPLICATION_ID;
     const guildId = process.env.DISCORD_GUILD_ID; // Optional: for guild-specific commands
 
+    // Validate required environment variables
+    if (!applicationId) {
+      console.error('❌ ERROR: DISCORD_APPLICATION_ID is not set!');
+      console.error('   Please set it in your .env file or environment variables.');
+      process.exit(1);
+    }
+
+    if (!process.env.DISCORD_BOT_TOKEN) {
+      console.error('❌ ERROR: DISCORD_BOT_TOKEN is not set!');
+      console.error('   Please set it in your .env file or environment variables.');
+      process.exit(1);
+    }
+
+    console.log(`✅ Application ID: ${applicationId.substring(0, 10)}...`);
+    if (guildId) {
+      console.log(`✅ Guild ID: ${guildId}`);
+    }
+
     if (guildId) {
       // Register guild-specific commands (faster, for testing)
       await rest.put(
@@ -42,7 +60,14 @@ const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_BOT_TOKEN)
       console.log('Successfully reloaded application (/) commands globally.');
     }
   } catch (error) {
-    console.error('Error registering commands:', error);
+    console.error('❌ Error registering commands:', error.message);
+    if (error.status === 401) {
+      console.error('   This usually means DISCORD_BOT_TOKEN is invalid or expired.');
+    } else if (error.status === 404) {
+      console.error('   This usually means DISCORD_APPLICATION_ID is incorrect.');
+    }
+    console.error('   Full error:', error);
+    process.exit(1);
   }
 })();
 
