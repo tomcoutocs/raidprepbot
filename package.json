@@ -1,0 +1,30 @@
+{
+  "name": "raidprep-discord-bot",
+  "version": "1.0.0",
+  "description": "Serverless Discord bot for event sign-ups using Vercel",
+  "main": "api/interactions.js",
+  "scripts": {
+    "dev": "vercel dev",
+    "deploy": "vercel --prod",
+    "register": "node utils/register-commands.js",
+    "check-env": "node utils/check-env.js"
+  },
+  "keywords": [
+    "discord",
+    "bot",
+    "serverless",
+    "vercel"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@discordjs/rest": "^2.2.0",
+    "discord-api-types": "^0.37.0",
+    "discord-interactions": "^3.3.1",
+    "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "@vercel/node": "^3.0.0"
+  }
+}
+
