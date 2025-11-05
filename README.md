@@ -64,8 +64,8 @@ The bot includes the following sign-up options:
 
 1. **Clone and Install:**
    ```bash
-   git clone <your-repo-url>
-   cd raidprep
+   git clone https://github.com/tomcoutocs/raidprepbot.git
+   cd raidprepbot
    npm install
    ```
 
