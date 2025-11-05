@@ -31,34 +31,50 @@ module.exports = async (req, res) => {
   // Verify Discord signature
   const publicKey = process.env.DISCORD_PUBLIC_KEY;
   if (!publicKey) {
+    console.error('DISCORD_PUBLIC_KEY not set');
     return res.status(500).json({ error: 'DISCORD_PUBLIC_KEY not set' });
   }
 
   try {
-    // Get raw body for verification
-    // In Vercel, we need to handle the body correctly
     const signature = req.headers['x-signature-ed25519'];
     const timestamp = req.headers['x-signature-timestamp'];
     
-    // Get raw body as string
-    let rawBody;
-    if (typeof req.body === 'string') {
-      rawBody = req.body;
-    } else {
-      rawBody = JSON.stringify(req.body);
+    if (!signature || !timestamp) {
+      console.error('Missing signature headers');
+      return res.status(401).json({ error: 'Missing signature headers' });
     }
 
+    // Get raw body - try multiple methods for Vercel compatibility
+    let rawBody;
+    
+    // Method 1: Check if rawBody is available (some Vercel configurations)
+    if (req.rawBody) {
+      rawBody = typeof req.rawBody === 'string' ? req.rawBody : req.rawBody.toString();
+    }
+    // Method 2: Check if body is already a string
+    else if (typeof req.body === 'string') {
+      rawBody = req.body;
+    }
+    // Method 3: Stringify parsed body (fallback - may fail verification)
+    else if (req.body) {
+      rawBody = JSON.stringify(req.body);
+    }
+    else {
+      return res.status(400).json({ error: 'No request body' });
+    }
+    
     const { verifyKey } = require('discord-interactions');
     const isValid = verifyKey(rawBody, signature, timestamp, publicKey);
 
     if (!isValid) {
+      console.error('Invalid signature verification');
       return res.status(401).json({ error: 'Invalid signature' });
     }
 
     // Parse interaction body
     const interaction = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
 
-    // Handle PING
+    // Handle PING (Discord's verification request)
     if (interaction.type === InteractionType.PING) {
       return res.json({ type: InteractionResponseType.PONG });
     }
@@ -227,4 +243,3 @@ async function handleComponent(interaction, res) {
 
   return res.status(400).json({ error: 'Unknown component' });
 }
-

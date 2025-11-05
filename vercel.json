@@ -11,6 +11,11 @@
       "src": "/api/interactions",
       "dest": "/api/interactions.js"
     }
-  ]
+  ],
+  "functions": {
+    "api/interactions.js": {
+      "maxDuration": 10
+    }
+  }
 }
 
