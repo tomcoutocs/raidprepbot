@@ -22,6 +22,34 @@ const EVENT_OPTIONS = [
   { label: 'Doors', value: 'doors' },
 ];
 
+// Helper to get raw body for signature verification
+// This is critical - Discord requires the exact raw body string
+function getRawBody(req) {
+  // Vercel may provide rawBody in some configurations
+  if (req.rawBody) {
+    return typeof req.rawBody === 'string' ? req.rawBody : req.rawBody.toString('utf8');
+  }
+  
+  // If body is already a string (not parsed), use it
+  if (typeof req.body === 'string') {
+    return req.body;
+  }
+  
+  // If body is a Buffer, convert to string
+  if (Buffer.isBuffer(req.body)) {
+    return req.body.toString('utf8');
+  }
+  
+  // Last resort: stringify parsed JSON
+  // This may fail signature verification if JSON.stringify produces different output
+  // But it's better than nothing
+  if (req.body) {
+    return JSON.stringify(req.body);
+  }
+  
+  return null;
+}
+
 module.exports = async (req, res) => {
   // Handle GET requests (health check)
   if (req.method === 'GET') {
@@ -34,6 +62,14 @@ module.exports = async (req, res) => {
     console.error('DISCORD_PUBLIC_KEY not set');
     return res.status(500).json({ error: 'DISCORD_PUBLIC_KEY not set' });
   }
+  
+  // Validate public key format (should be hex string, 64 chars)
+  if (publicKey.length !== 64 || !/^[0-9a-fA-F]+$/.test(publicKey)) {
+    console.error('DISCORD_PUBLIC_KEY format appears invalid');
+    console.error('Expected: 64-character hex string');
+    console.error('Got:', publicKey.length, 'characters');
+    // Continue anyway - might still work
+  }
 
   try {
     const signature = req.headers['x-signature-ed25519'];
@@ -44,22 +80,11 @@ module.exports = async (req, res) => {
       return res.status(401).json({ error: 'Missing signature headers' });
     }
 
-    // Get raw body - try multiple methods for Vercel compatibility
-    let rawBody;
+    // Get raw body for signature verification
+    const rawBody = getRawBody(req);
     
-    // Method 1: Check if rawBody is available (some Vercel configurations)
-    if (req.rawBody) {
-      rawBody = typeof req.rawBody === 'string' ? req.rawBody : req.rawBody.toString();
-    }
-    // Method 2: Check if body is already a string
-    else if (typeof req.body === 'string') {
-      rawBody = req.body;
-    }
-    // Method 3: Stringify parsed body (fallback - may fail verification)
-    else if (req.body) {
-      rawBody = JSON.stringify(req.body);
-    }
-    else {
+    if (!rawBody) {
+      console.error('No request body found');
       return res.status(400).json({ error: 'No request body' });
     }
     
@@ -68,11 +93,23 @@ module.exports = async (req, res) => {
 
     if (!isValid) {
       console.error('Invalid signature verification');
+      console.error('Body length:', rawBody.length);
+      console.error('Body preview:', rawBody.substring(0, 100));
+      console.error('Signature present:', !!signature);
+      console.error('Timestamp present:', !!timestamp);
+      console.error('Public key present:', !!publicKey);
       return res.status(401).json({ error: 'Invalid signature' });
     }
 
-    // Parse interaction body
-    const interaction = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+    // Parse interaction body for processing
+    let interaction;
+    if (typeof req.body === 'string') {
+      interaction = JSON.parse(req.body);
+    } else if (req.body) {
+      interaction = req.body;
+    } else {
+      interaction = JSON.parse(rawBody);
+    }
 
     // Handle PING (Discord's verification request)
     // This is the first thing Discord sends to verify the endpoint
