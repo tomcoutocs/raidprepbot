@@ -75,7 +75,10 @@ module.exports = async (req, res) => {
     const interaction = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
 
     // Handle PING (Discord's verification request)
+    // This is the first thing Discord sends to verify the endpoint
+    // Must respond quickly without any external API calls
     if (interaction.type === InteractionType.PING) {
+      console.log('Received PING from Discord - responding with PONG');
       return res.json({ type: InteractionResponseType.PONG });
     }
 
@@ -92,7 +95,21 @@ module.exports = async (req, res) => {
     return res.status(400).json({ error: 'Unknown interaction type' });
   } catch (error) {
     console.error('Error handling interaction:', error);
-    return res.status(500).json({ error: 'Internal server error' });
+    console.error('Error details:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name,
+    });
+    
+    // Return appropriate error response
+    if (error.message && error.message.includes('DNS')) {
+      console.error('DNS resolution error - check environment variables and network connectivity');
+    }
+    
+    return res.status(500).json({ 
+      error: 'Internal server error',
+      message: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 };
 
@@ -204,8 +221,21 @@ async function handleComponent(interaction, res) {
       timestamp: interaction.message.embeds[0]?.timestamp || new Date().toISOString(),
     };
 
+    // Validate bot token before making API calls
+    const botToken = process.env.DISCORD_BOT_TOKEN;
+    if (!botToken) {
+      console.error('DISCORD_BOT_TOKEN not set');
+      return res.json({
+        type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+        data: {
+          content: '❌ Bot configuration error. Please contact the administrator.',
+          flags: 64, // EPHEMERAL
+        },
+      });
+    }
+
     // Acknowledge the interaction and update the message
-    const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_BOT_TOKEN);
+    const rest = new REST({ version: '10' }).setToken(botToken);
 
     try {
       // Update the original message
@@ -231,6 +261,14 @@ async function handleComponent(interaction, res) {
       });
     } catch (error) {
       console.error('Error updating message:', error);
+      console.error('Error details:', {
+        message: error.message,
+        code: error.code,
+        status: error.status,
+        name: error.name,
+      });
+      
+      // Return a user-friendly error message
       return res.json({
         type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
         data: {
